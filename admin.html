@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Music Player</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Admin Panel</h1>
+            <a href="index.html">Back to Player</a>
+        </header>
+
+        <main>
+            <div class="form-panel">
+                <h2 id="form-title" style="margin-bottom: 1.5rem;">Add New Song</h2>
+                <form id="song-form">
+                    <input type="hidden" id="song-id">
+                    
+                    <div class="form-group">
+                        <label for="title">Song Title *</label>
+                        <input type="text" id="title" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="artist">Artist *</label>
+                        <input type="text" id="artist" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="album">Album</label>
+                        <input type="text" id="album">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cover_url">Cover Image URL (Cloudinary)</label>
+                        <input type="url" id="cover_url" placeholder="https://res.cloudinary.com/...">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="audio_url">Audio URL (Cloudinary) *</label>
+                        <input type="url" id="audio_url" required placeholder="https://res.cloudinary.com/.../video/upload/...mp3">
+                    </div>
+                    
+                    <button type="submit" class="btn" id="submit-btn">Save Song</button>
+                    <button type="button" class="btn btn-danger" id="cancel-btn" style="display: none; margin-left: 10px;">Cancel Edit</button>
+                </form>
+            </div>
+
+            <div class="song-list-panel">
+                <h2 style="margin-bottom: 1.5rem;">Manage Songs</h2>
+                <div id="admin-song-list" class="song-list">
+                    <p>Loading songs...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        import { fetchSongs, addSong, updateSong, deleteSong } from './app.js';
+
+        const songForm = document.getElementById('song-form');
+        const adminSongList = document.getElementById('admin-song-list');
+        const formTitle = document.getElementById('form-title');
+        const submitBtn = document.getElementById('submit-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        
+        let editingId = null;
+
+        async function loadAdminSongs() {
+            const songs = await fetchSongs();
+            adminSongList.innerHTML = '';
+
+            if (songs.length === 0) {
+                adminSongList.innerHTML = '<p>No songs found.</p>';
+                return;
+            }
+
+            songs.forEach(song => {
+                const songItem = document.createElement('div');
+                songItem.className = 'song-item';
+                
+                const coverUrl = song.cover_url || 'https://via.placeholder.com/60?text=Music';
+                
+                songItem.innerHTML = `
+                    <img src="${coverUrl}" alt="${song.title}" class="song-cover">
+                    <div class="song-info">
+                        <div class="song-title">${song.title}</div>
+                        <div class="song-artist">${song.artist}</div>
+                    </div>
+                    <div class="song-actions">
+                        <button class="btn-edit" data-id="${song.id}">Edit</button>
+                        <button class="btn-danger" data-id="${song.id}">Delete</button>
+                    </div>
+                `;
+
+                adminSongList.appendChild(songItem);
+            });
+
+            // Add event listeners for edit and delete buttons
+            document.querySelectorAll('.btn-edit').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = e.target.getAttribute('data-id');
+                    const song = songs.find(s => s.id === id);
+                    if (song) startEdit(song);
+                });
+            });
+
+            document.querySelectorAll('.btn-danger').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const id = e.target.getAttribute('data-id');
+                    if (confirm('Are you sure you want to delete this song?')) {
+                        await deleteSong(id);
+                        loadAdminSongs(); // Reload list
+                    }
+                });
+            });
+        }
+
+        function startEdit(song) {
+            editingId = song.id;
+            document.getElementById('song-id').value = song.id;
+            document.getElementById('title').value = song.title;
+            document.getElementById('artist').value = song.artist;
+            document.getElementById('album').value = song.album || '';
+            document.getElementById('cover_url').value = song.cover_url || '';
+            document.getElementById('audio_url').value = song.audio_url;
+
+            formTitle.textContent = 'Edit Song';
+            submitBtn.textContent = 'Update Song';
+            cancelBtn.style.display = 'inline-block';
+            window.scrollTo(0, 0);
+        }
+
+        function resetForm() {
+            editingId = null;
+            songForm.reset();
+            document.getElementById('song-id').value = '';
+            formTitle.textContent = 'Add New Song';
+            submitBtn.textContent = 'Save Song';
+            cancelBtn.style.display = 'none';
+        }
+
+        cancelBtn.addEventListener('click', resetForm);
+
+        songForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+
+            const songData = {
+                title: document.getElementById('title').value,
+                artist: document.getElementById('artist').value,
+                album: document.getElementById('album').value || null,
+                cover_url: document.getElementById('cover_url').value || null,
+                audio_url: document.getElementById('audio_url').value
+            };
+
+            try {
+                if (editingId) {
+                    await updateSong(editingId, songData);
+                } else {
+                    await addSong(songData);
+                }
+                resetForm();
+                await loadAdminSongs();
+            } catch (error) {
+                alert('Error saving song. Check console for details.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = editingId ? 'Update Song' : 'Save Song';
+            }
+        });
+
+        // Initialize
+        loadAdminSongs();
+    </script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Player</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>My Music</h1>
+            <a href="admin.html">Admin Panel</a>
+        </header>
+
+        <main>
+            <div id="song-list" class="song-list">
+                <!-- Songs will be loaded here dynamically -->
+                <p>Loading songs...</p>
+            </div>
+        </main>
+    </div>
+
+    <div id="player-container" class="player-container">
+        <div class="now-playing">
+            <img id="now-playing-cover" src="" alt="Cover">
+            <div>
+                <div id="now-playing-title" class="song-title">Select a song</div>
+                <div id="now-playing-artist" class="song-artist">to start playing</div>
+            </div>
+        </div>
+        <div class="audio-controls">
+            <audio id="audio-player" controls>
+                <source id="audio-source" src="" type="audio/mpeg">
+                Your browser does not support the audio element.
+            </audio>
+        </div>
+    </div>
+
+    <script type="module">
+        import { fetchSongs } from './app.js';
+
+        const songListEl = document.getElementById('song-list');
+        const playerContainer = document.getElementById('player-container');
+        const audioPlayer = document.getElementById('audio-player');
+        const audioSource = document.getElementById('audio-source');
+        const nowPlayingTitle = document.getElementById('now-playing-title');
+        const nowPlayingArtist = document.getElementById('now-playing-artist');
+        const nowPlayingCover = document.getElementById('now-playing-cover');
+
+        async function loadSongs() {
+            const songs = await fetchSongs();
+            songListEl.innerHTML = '';
+
+            if (songs.length === 0) {
+                songListEl.innerHTML = '<p>No songs found. Add some from the Admin Panel.</p>';
+                return;
+            }
+
+            songs.forEach(song => {
+                const songItem = document.createElement('div');
+                songItem.className = 'song-item';
+                
+                const coverUrl = song.cover_url || 'https://via.placeholder.com/60?text=Music';
+                
+                songItem.innerHTML = `
+                    <img src="${coverUrl}" alt="${song.title}" class="song-cover">
+                    <div class="song-info">
+                        <div class="song-title">${song.title}</div>
+                        <div class="song-artist">${song.artist} ${song.album ? `· ${song.album}` : ''}</div>
+                    </div>
+                `;
+
+                songItem.addEventListener('click', () => playSong(song));
+                songListEl.appendChild(songItem);
+            });
+        }
+
+        function playSong(song) {
+            audioPlayer.src = song.audio_url;
+            audioPlayer.play().catch(e => console.error("Playback failed", e));
+            
+            nowPlayingTitle.textContent = song.title;
+            nowPlayingArtist.textContent = song.artist;
+            nowPlayingCover.src = song.cover_url || 'https://via.placeholder.com/60?text=Music';
+            
+            playerContainer.classList.add('active');
+        }
+
+        // Initialize
+        loadSongs();
+    </script>
+</body>
+</html>
